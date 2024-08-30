@@ -226,7 +226,7 @@ def encrypt(pt, rkb, rk):
 
 		# S-boxex: substituting the value from s-box table by calculating row and column
 		sbox_str = ""
-		for j in range(0, 8):
+		for j in range(0, 8): # The result of the XOR operation is divided into eight 6-bit blocks.
 			row = bin2dec(int(xor_x[j * 6] + xor_x[j * 6 + 5]))
 			col = bin2dec(
 				int(xor_x[j * 6 + 1] + xor_x[j * 6 + 2] + xor_x[j * 6 + 3] + xor_x[j * 6 + 4]))

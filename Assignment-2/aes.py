@@ -1,5 +1,7 @@
 
-
+'''
+These are predefined substitution boxes used in the AES algorithm. Sbox is used during encryption, and InvSbox is used during decryption. They perform non-linear substitution (or byte substitution) during the encryption and decryption process.
+'''
 
 Sbox = (
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -39,10 +41,14 @@ InvSbox = (
     0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D,
 )
 
+'''
+This lambda function calculates xtime, which is a fundamental operation in the MixColumns step of AES. It performs a multiplication by 2 in the finite field 
+'''
 
 # learnt from http://cs.ucsb.edu/~koc/cs178/projects/JT/aes.c
 xtime = lambda a: (((a << 1) ^ 0x1B) & 0xFF) if (a & 0x80) else (a << 1)
 
+# The round constant Rcon is used in the key expansion process. Each element in Rcon is XORed with the first byte of the current round key during the key expansion.
 
 Rcon = (
     0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40,
@@ -50,6 +56,8 @@ Rcon = (
     0x2F, 0x5E, 0xBC, 0x63, 0xC6, 0x97, 0x35, 0x6A,
     0xD4, 0xB3, 0x7D, 0xFA, 0xEF, 0xC5, 0x91, 0x39,
 )
+
+# Converts a 128-bit integer (text) into a 4x4 byte matrix. This transformation is required because AES operates on a 4x4 byte matrix (state matrix).
 
 
 def text2matrix(text):
@@ -63,6 +71,8 @@ def text2matrix(text):
     return matrix
 
 
+# Converts a 4x4 byte matrix back into a 128-bit integer (text). This is the inverse operation of text2matrix.
+
 
 def matrix2text(matrix):
     text = 0
@@ -74,9 +84,17 @@ def matrix2text(matrix):
 
 class AES:
     def __init__(self, master_key):
-        self.change_key(master_key)
+        self.change_key(master_key) # generates all the round keys from the master key
 
     def change_key(self, master_key):
+        # This method generates the round keys from the master_key using key expansion. The AES algorithm requires 10 rounds of encryption for 128-bit keys, so it expands the key into 11 round keys, each consisting of 4 words.
+        #  Key Expansion:
+
+        # For each new key word, it either:
+        # Performs an XOR of the previous word with the word four places before it (i - 4).
+        # If the index is a multiple of 4, it performs an additional operation involving Sbox, Rcon, and a byte rotation.
+        # Appends the result to self.round_keys.
+
         self.round_keys = text2matrix(master_key)
         # print self.round_keys
 
@@ -101,6 +119,13 @@ class AES:
         # print self.round_keys
 
     def encrypt(self, plaintext):
+#         Encrypts a 128-bit plaintext using the AES algorithm.
+# It first converts the plaintext into a state matrix.
+# It then performs the following steps:
+# AddRoundKey: XOR the state with the first round key.
+# 9 Rounds of AES: Each round includes SubBytes, ShiftRows, MixColumns, and AddRoundKey.
+# Final Round: SubBytes, ShiftRows, and AddRoundKey, without the MixColumns step.
+# Finally, it converts the state matrix back into a 128-bit integer and returns the ciphertext.
         self.plain_state = text2matrix(plaintext)
 
         self.__add_round_key(self.plain_state, self.round_keys[:4])
@@ -115,6 +140,13 @@ class AES:
         return matrix2text(self.plain_state)
 
     def decrypt(self, ciphertext):
+#         Decrypts a 128-bit ciphertext using the AES algorithm.
+# It first converts the ciphertext into a state matrix.
+# It then performs the following steps:
+# Inverse AddRoundKey: XOR the state with the last round key.
+# 9 Rounds of Inverse AES: Each round includes Inverse ShiftRows, Inverse SubBytes, Inverse MixColumns, and Inverse AddRoundKey.
+# Final Inverse Round: Inverse ShiftRows, Inverse SubBytes, and AddRoundKey, without the Inverse MixColumns step.
+# Finally, it converts the state matrix back into a 128-bit integer and returns the plaintext.
         self.cipher_state = text2matrix(ciphertext)
 
         self.__add_round_key(self.cipher_state, self.round_keys[40:])
@@ -129,11 +161,12 @@ class AES:
         return matrix2text(self.cipher_state)
 
     def __add_round_key(self, s, k):
+        # XORs each byte of the state matrix with the corresponding byte of the round key
         for i in range(4):
             for j in range(4):
                 s[i][j] ^= k[i][j]
 
-
+    # These methods perform one round of encryption or decryption, respectively. They include SubBytes, ShiftRows, MixColumns (for encryption), and AddRoundKey operations.
     def __round_encrypt(self, state_matrix, key_matrix):
         self.__sub_bytes(state_matrix)
         self.__shift_rows(state_matrix)
@@ -147,24 +180,25 @@ class AES:
         self.__inv_shift_rows(state_matrix)
         self.__inv_sub_bytes(state_matrix)
 
+    # __sub_bytes: Replaces each byte in the state matrix with its corresponding value in the Sbox.
     def __sub_bytes(self, s):
         for i in range(4):
             for j in range(4):
                 s[i][j] = Sbox[s[i][j]]
 
-
+    # __inv_sub_bytes: Replaces each byte in the state matrix with its corresponding value in the InvSbox.
     def __inv_sub_bytes(self, s):
         for i in range(4):
             for j in range(4):
                 s[i][j] = InvSbox[s[i][j]]
 
-
+    # __shift_rows: Cyclically shifts the bytes in each row of the state matrix to the left by their row index.
     def __shift_rows(self, s):
         s[0][1], s[1][1], s[2][1], s[3][1] = s[1][1], s[2][1], s[3][1], s[0][1]
         s[0][2], s[1][2], s[2][2], s[3][2] = s[2][2], s[3][2], s[0][2], s[1][2]
         s[0][3], s[1][3], s[2][3], s[3][3] = s[3][3], s[0][3], s[1][3], s[2][3]
 
-
+    # __inv_shift_rows: Cyclically shifts the bytes in each row of the state matrix to the right by their row index.
     def __inv_shift_rows(self, s):
         s[0][1], s[1][1], s[2][1], s[3][1] = s[3][1], s[0][1], s[1][1], s[2][1]
         s[0][2], s[1][2], s[2][2], s[3][2] = s[2][2], s[3][2], s[0][2], s[1][2]
@@ -172,6 +206,7 @@ class AES:
 
     def __mix_single_column(self, a):
         # please see Sec 4.1.2 in The Design of Rijndael
+        # __mix_single_column: Mixes one column of the state matrix by applying a linear transformation.
         t = a[0] ^ a[1] ^ a[2] ^ a[3]
         u = a[0]
         a[0] ^= t ^ xtime(a[0] ^ a[1])
@@ -179,12 +214,12 @@ class AES:
         a[2] ^= t ^ xtime(a[2] ^ a[3])
         a[3] ^= t ^ xtime(a[3] ^ u)
 
-
+    # __mix_columns: Applies __mix_single_column to all columns of the state matrix.
     def __mix_columns(self, s):
         for i in range(4):
             self.__mix_single_column(s[i])
 
-
+    # Reverses the mixing of columns during decryption by using an inverse linear transformation.
     def __inv_mix_columns(self, s):
         # see Sec 4.1.3 in The Design of Rijndael
         for i in range(4):
